@@ -434,6 +434,9 @@ const GROUPS = [
     {id:'alg_simp',lb:'Expressões algébricas',on:false},
     {id:'logic_m',lb:'Lógica matemática',on:false},
     {id:'logic_c',lb:'Lógica clássica (V/F)',on:false},
+    {id:'vel_mul',lb:'× Multiplicação rápida',on:false},
+    {id:'vel_div',lb:'÷ Divisão rápida',on:false},
+    {id:'vel_not',lb:'★ Mult/Div notáveis',on:false},
     {id:'r3',lb:'📐 Regra de 3',on:false},
   ]},
   { label:'EM — Potenciação e Notação Científica', ops:[
@@ -476,6 +479,7 @@ const LBLS = {
   pct:'Porcentagem',pct2:'Valor → %',mmc:'MMC',mdc:'MDC',
   frac_eq:'Frações equiv.',mult_div:'Múltiplos/Divisores',alg_simp:'Expr. algébricas',
   logic_m:'Lógica matemática',logic_c:'Lógica clássica',r3:'Regra de 3',
+  vel_mul:'Multiplicação rápida',vel_div:'Divisão rápida',vel_not:'Mult/Div notáveis',
   pown:'Potência negativa',nota:'Notação científica',
   eq1:'Equação 1º grau',eq2:'Equação 2º grau',pa:'PA — termo n',pg:'PG — termo n',
   si:'Juros simples',ci:'Juros compostos',desc:'Desconto simples',
@@ -598,7 +602,77 @@ function genQ(id){
       isLogic=true;logicOpts=['V','F'];break;
     }
 
-    case 'pown':{const b=R(-5,5),e=R(2,4);q=`(${b})^${e}`;a=Math.pow(b,e);break;}
+    case 'vel_mul':{
+      // fácil 1-20, médio 1-50, difícil 51-big; 80% exato, 20% decimal
+      const lim=difficulty<=3?20:difficulty<=6?50:Math.min(big,1000000000);
+      const x=R(1,lim),y=R(1,lim);
+      const exact=Math.random()<0.8;
+      if(exact){
+        q=`${fmtN(x)} × ${fmtN(y)}`;a=x*y;
+      }else{
+        const xd=parseFloat((R(1,lim*10)/10).toFixed(1));
+        q=`${xd} × ${fmtN(y)}`;a=parseFloat((xd*y).toFixed(2));
+      }
+      break;
+    }
+
+    case 'vel_div':{
+      const lim=difficulty<=3?20:difficulty<=6?50:Math.min(big,1000000000);
+      const exact=Math.random()<0.8;
+      if(exact){
+        const y=R(1,lim),a2=R(1,lim);q=`${fmtN(y*a2)} ÷ ${fmtN(y)}`;a=a2;
+      }else{
+        const y=R(2,lim),x=R(y+1,lim*2);
+        q=`${fmtN(x)} ÷ ${fmtN(y)}`;a=parseFloat((x/y).toFixed(2));
+      }
+      break;
+    }
+
+    case 'vel_not':{
+      const NOTABLE=[1,2,3,4,5,6,7,8,9,10,20,25,50,75,100];
+      const factor=NOTABLE[R(0,NOTABLE.length-1)];
+      const base=R(1,Math.min(big,1000000000));
+      const isDiv=Math.random()<0.5;
+      // medium (dif 4-6): may show as fraction
+      const useFrac=difficulty>=4&&difficulty<=6&&Math.random()<0.5;
+      // fraction representations for ×: e.g. ×(5/10)=×0.5, ×(1/2)=×0.5
+      const fracMap={
+        2:['2/1'],3:['3/1'],4:['4/1'],5:['5/1','10/2'],
+        6:['6/1'],7:['7/1'],8:['8/1'],9:['9/1'],10:['10/1'],
+        20:['20/1'],25:['25/1','100/4','50/2'],50:['50/1','100/2'],
+        75:['75/1','150/2'],100:['100/1']
+      };
+      const divFracMap={
+        2:['1/2','2/4'],3:['1/3'],4:['1/4','2/8'],5:['1/5','2/10'],
+        6:['1/6'],8:['1/8'],10:['1/10','2/20'],20:['1/20'],
+        25:['1/25','4/100'],50:['1/50','2/100'],100:['1/100']
+      };
+      if(isDiv){
+        a=parseFloat((base/factor).toFixed(4));
+        if(useFrac&&divFracMap[factor]){
+          const fr=divFracMap[factor][R(0,divFracMap[factor].length-1)];
+          q=`${fmtN(base)} ÷ (${fr})`;
+          // ÷ (1/n) = × n, so recompute
+          const [fn,fd]=fr.split('/').map(Number);
+          a=parseFloat((base*fd/fn).toFixed(4));
+        }else{
+          q=`${fmtN(base)} ÷ ${factor}`;
+        }
+      }else{
+        a=parseFloat((base*factor).toFixed(4));
+        if(useFrac&&fracMap[factor]){
+          const fr=fracMap[factor][R(0,fracMap[factor].length-1)];
+          q=`${fmtN(base)} × (${fr})`;
+          const [fn,fd]=fr.split('/').map(Number);
+          a=parseFloat((base*fn/fd).toFixed(4));
+        }else{
+          q=`${fmtN(base)} × ${factor}`;
+        }
+      }
+      // if result is whole number, show as integer
+      if(Number.isInteger(a))a=Math.round(a);
+      break;
+    }{const b=R(-5,5),e=R(2,4);q=`(${b})^${e}`;a=Math.pow(b,e);break;}
     case 'nota':{const c=[1,2,3,5,7][R(0,4)],e=R(-2,5);q=`${c} × 10^${e}`;a=parseFloat((c*Math.pow(10,e)).toFixed(6));break;}
     case 'eq1':{const a2=R(1,8)*pm(),b2=R(-15,15),x=R(-8,8);q=`${a2}x ${b2>=0?'+ '+b2:'− '+Math.abs(b2)} = ${a2*x+b2}\nx = ?`;a=x;break;}
     case 'eq2':{const x1=R(-5,5),x2=R(-5,5);const B=-(x1+x2),C=x1*x2;q=`x² ${B>0?'+ '+B:B<0?'− '+Math.abs(B):''} ${C>0?'+ '+C:C<0?'− '+Math.abs(C):''} = 0\nraiz menor?`;a=Math.min(x1,x2);break;}
